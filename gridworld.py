@@ -1,49 +1,58 @@
 import numpy as np
 
+
 class GridWorld:
+    """
+    Actions:
+    There are 6 discrete deterministic actions:
+    - 0: move south
+    - 1: move north
+    - 2: move east
+    - 3: move west
+    - 4: pickup passenger
+    - 5: dropoff passenger
+
+     actions:
+    - 0: south
+    - 1: north
+    - 2: east
+    - 3: west
+    - 4: pickup
+    - 5: dropoff
+
+    state space is represented by:
+        (taxi_row, taxi_col, passenger_location, destination)
+    """
     
-    locations = {'R': (0, 0),
-                  'G': (0, 4),
-                  'Y': (4, 0),
-                  'B': (4, 3)}
+    def __init__(self, tx, ps):
+        num_states = 500
+        num_rows = 5
+        num_columns = 5
+        max_row = num_rows - 1
+        max_col = num_columns - 1
+        initial_state_distrib = np.zeros(num_states)
+        self.num_actions = 6
+        P = {state: {action: [] for action in range(self.num_actions)} for state in range(num_states)}
+        self.sarsa(tx, ps)
 
-    def __init__(self):
-        self.size = (5, 5)
-        self.grid = self._make_grid()
-        self.rewards = self._reward_grid()
+    def sarsa(self, tx, ps):
 
-    def display_grid(self, Passenger, Taxi):
-        print('+---------+')
-        print('|R: | : :G|')
-        print('| : : : : |')
-        print('| : : : : |')
-        print('| | : | : |')
-        print('|Y| : |B: |')
-        print('+---------+')
+        # initialize state
+        state = (tx.start[0], tx.start[1], ps.source, ps.destination)
+        encoded_state = self.encode(tx.start[0], tx.start[1], ps.source, ps.destination)
 
-        for i, j in np.ndenumerate(np.array((5, 5))):
-            print()
-
+        # actions
+        for actions in range(self.num_actions):
+            pass
 
 
-    def _make_grid(self):
-        pass
-
-    def _reward_grid(self):
-        rewards = {'per_action': -1,
-                   'successful_delivery': 20,
-                   'illegal_attempt': -10}
-
-        return rewards
-
-    def allowed_movements(self, current, next):
-        if current == (0, 1) and next == (0, 2) or current == (0, 2) and next == (0, 1) or \
-            current == (1, 1) and next == (1, 2) or current == (1, 2) and next == (1, 1) or \
-            current == (3, 0) and next == (3, 1) or current == (3, 1) and next == (3, 0) or \
-            current == (4, 0) and next == (4, 1) or current == (4, 1) and next == (4, 0) or \
-            current == (3, 2) and next == (3, 3) or current == (3, 3) and next == (3, 2) or \
-            current == (4, 2) and next == (4, 3) or current == (4, 3) and next == (4, 2):
-
-            next = current
-
-        return next
+    def encode(self, taxi_row, taxi_col, pass_loc, dest_idx):
+        # (5) 5, 5, 4
+        i = taxi_row
+        i *= 5
+        i += taxi_col
+        i *= 5
+        i += pass_loc
+        i *= 4
+        i += dest_idx
+        return i

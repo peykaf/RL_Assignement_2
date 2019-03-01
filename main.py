@@ -1,13 +1,13 @@
 from gridworld import GridWorld
 from taxi import Taxi
 from passenger import Passenger
+import random
 
 def main():
-    gw = GridWorld()
-    ps = Passenger()
     tx = Taxi()
+    ps = Passenger()
+    gw = GridWorld(tx, ps)
 
-    gw.display_grid(ps, tx)
 
 if __name__ == "__main__":
     main()
