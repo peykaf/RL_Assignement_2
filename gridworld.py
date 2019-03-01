@@ -38,12 +38,19 @@ class GridWorld:
     def sarsa(self, tx, ps):
 
         # initialize state
-        state = (tx.start[0], tx.start[1], ps.source, ps.destination)
+        row = tx.start[0]
+        col = tx.start[1]
+        state = (row, col, ps.source, ps.destination)
         encoded_state = self.encode(tx.start[0], tx.start[1], ps.source, ps.destination)
 
         # actions
-        for actions in range(self.num_actions):
-            pass
+        for action in range(self.num_actions):
+            new_row, new_col, new_source = row, col, ps.source
+            # south
+            if action == 0:
+                new_row = 
+
+
 
 
     def encode(self, taxi_row, taxi_col, pass_loc, dest_idx):
