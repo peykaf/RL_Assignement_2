@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 
 class GridWorld:
@@ -25,32 +26,55 @@ class GridWorld:
     """
     
     def __init__(self, tx, ps):
+
+        # input
         num_states = 500
         num_rows = 5
         num_columns = 5
-        max_row = num_rows - 1
-        max_col = num_columns - 1
+        self.max_row = num_rows - 1
+        self.max_col = num_columns - 1
         initial_state_distrib = np.zeros(num_states)
         self.num_actions = 6
-        P = {state: {action: [] for action in range(self.num_actions)} for state in range(num_states)}
+        self.P = {state: {action: [] for action in range(self.num_actions)} for state in range(num_states)}
+        self.Q = {state: {action: 0 for action in range(self.num_actions)} for state in range(num_states)}
         self.sarsa(tx, ps)
 
     def sarsa(self, tx, ps):
-
         # initialize state
-        row = tx.start[0]
-        col = tx.start[1]
+        row = tx.location[0]
+        col = tx.location[1]
         state = (row, col, ps.source, ps.destination)
-        encoded_state = self.encode(tx.start[0], tx.start[1], ps.source, ps.destination)
+        encoded_state = self.encode(row, col, ps.source, ps.destination)
+        delivered = False
 
         # actions
+        action = self.boltzmann_softmax()
+        
         for action in range(self.num_actions):
             new_row, new_col, new_source = row, col, ps.source
             # south
             if action == 0:
-                new_row = 
-
-
+                new_row = min(row + 1, self.max_row)
+            elif action == 1:
+                new_row = max(row - 1, 0)
+            elif action == 2:
+                new_col = min(col + 1, self.max_col)
+            elif action == 3:
+                new_col = max(col - 1, 0)
+            elif action == 4:  # pickup
+                if tx.location == ps.source:
+                    ps.is_in_taxi = True
+                else:  # illegal pickup
+                    reward = -10
+            elif action == 5:
+                if tx.location == ps.destination:
+                    reward = 20
+                    delivered = True
+                else:  # illegal putdown
+                    reward = -10
+        new_state = (new_row, new_col, ps.source, ps.destination)
+        new_encoded_state = self.encode(new_row, new_col, ps.source, ps.destination)
+        self.P[state][action].append(new_state, reward, delivered)
 
 
     def encode(self, taxi_row, taxi_col, pass_loc, dest_idx):
@@ -63,3 +87,8 @@ class GridWorld:
         i *= 4
         i += dest_idx
         return i
+
+    def boltzmann_softmax(self):
+        # choose action by boltzmann
+        # above is deterministic
+        pass

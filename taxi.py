@@ -7,7 +7,7 @@ class Taxi():
 
     
     def __init__(self):
-        self.start = (random.randint(0, 4), random.randint(0, 4))
+        self.location = (random.randint(0, 4), random.randint(0, 4))
         self.actions = {'north': (-1, 0),
                         'south': (1, 0),
                         'east': (0, 1),
@@ -15,6 +15,6 @@ class Taxi():
                         'pickup': (0, 0),
                         'putdown': (0, 0)}
         print('Taxi...')
-        print('  located at: {}'. format(self.start))
+        print('  located at: {}'. format(self.location))
 
 

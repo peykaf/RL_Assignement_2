@@ -13,6 +13,7 @@ class Passenger:
         self.source = random.randint(0, 3)
         self.destination = random.randint(0, 3)
         self.locs = [(0,0), (0,4), (4,0), (4,3)]
+        self.is_in_taxi = False
         print('Passenger...')
         print('  starting point: {} at {}'.format(self.source, self.locs[self.source]))
         print('  destination point: {} at {}'.format(self.destination, self.locs[self.destination]))
