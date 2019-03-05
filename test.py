@@ -1,8 +1,14 @@
 import numpy as np
 
-a = 1
+MAP = [
+    "+---------+",
+    "|R: | : :G|",
+    "| : : : : |",
+    "| : : : : |",
+    "| | : | : |",
+    "|Y| : |B: |",
+    "+---------+",
+]
 
-for i in range(0, 5):
-    for j in range(0, 5):
-        print (1)
-    print()
+desc = np.asarray(MAP, dtype='c')
+print(desc)
