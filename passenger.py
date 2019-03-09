@@ -24,6 +24,4 @@ class Passenger:
         self.locs = [(0, 0), (0, 4), (4, 0), (4, 3)]
         self.is_in_taxi = False
         self.delivered = False
-        # print('Passenger...')
-        # print('  starting point: {} at {}'.format(self.source, self.locs[self.source]))
-        # print('  destination point: {} at {}'.format(self.destination, self.locs[self.destination]))
+        print('  Passenger from {} to {}'.format(self.locs[self.source], self.locs[self.destination]))

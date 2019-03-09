@@ -44,7 +44,7 @@ class GridWorld:
             "|Y| : |B: |",
             "+---------+",
         ]
-        self.discount = 0.9
+        self.discount = 0.3
         self.grid = np.asarray(grid_map, dtype='c')
         self.temperature = temperature
         self.learning_rate = learning_rate
@@ -57,15 +57,16 @@ class GridWorld:
         self.num_actions = 6
         self.P = {state: {action: [] for action in range(self.num_actions)} for state in range(num_states)}
         self.locs = [(0, 0), (0, 4), (4, 0), (4, 3)]
+        self.visited_states = {enc_state: {state_ for state_ in range(0)} for enc_state in range(num_states)}
 
         # Q = {state: {action: 0 for action in range(self.num_actions)} for state in range(num_states)}
 
-        print('====================================================')
+        print('----------------------------------------------------')
         print('Solving with...{}'.format(solver))
-        print('====================================================')
 
-        runs = 5
-        segments = 100
+
+        runs = 1
+        segments = 10
         episodes = 10
 
         if solver == 'SARSA':
@@ -101,9 +102,30 @@ class GridWorld:
                                 print()
                             df = pd.DataFrame.from_dict(Q, orient="index")
                             df.to_csv("data.csv")
+
+                            df_visited_states = pd.DataFrame.from_dict(self.visited_states, orient="index")
+                            df_visited_states.to_csv('visited_states.csv')
                             self.run_optimal_policy(tx, ps, Q)
         elif solver == 'expected_SARSA':
-            pass
+            for run in range(runs):
+                Q = {state: {action: 0 for action in range(self.num_actions)} for state in range(num_states)}
+                for segment in range(segments):
+                    for episode in range(episodes + 1):
+                        print('----------------------------------------------------')
+                        print('Run {}, Segment {}, Episode {}...'.format(run, segment, episode))
+                        tx = Taxi()
+                        ps = Passenger()
+                        if episode < episodes:
+                            self.expected_sarsa(tx, ps, Q)
+                        else:  # the 11th episode: you pick actions greedily based on the current value estimates
+                            if run == 9:
+                                print()
+                            df = pd.DataFrame.from_dict(Q, orient="index")
+                            df.to_csv("data.csv")
+
+                            df_visited_states = pd.DataFrame.from_dict(self.visited_states, orient="index")
+                            df_visited_states.to_csv('visited_states.csv')
+                            self.run_optimal_policy(tx, ps, Q)
 
     def sarsa(self, tx, ps, Q):
         # initialize state
@@ -115,42 +137,68 @@ class GridWorld:
         # actions
         action, _ = self.boltzmann_softmax(encoded_state, Q, temperature=self.temperature)
 
-        counter = 0
+        step = 0
         while ps.delivered != True:
             # *************
-            print('S = ({}, {}) - {}'.format(row, col, encoded_state))
-            print('a = {}'.format(action))
+            # print('S = ({}, {}) - {}'.format(row, col, encoded_state))
+            # print('a = {}'.format(action))
 
             new_row, new_col, reward = self.action_effects(action, row, col, tx, ps)
             new_state = (new_row, new_col, ps.location, ps.destination)
             new_encoded_state = self.encode(new_row, new_col, ps.source, ps.destination)
             # *************
-            print("S' = ({}, {}) - {}".format(new_row, new_col, new_encoded_state))
-            print('r = {}'.format(reward))
+            # print("S' = ({}, {}) - {}".format(new_row, new_col, new_encoded_state))
+            # print('r = {}'.format(reward))
 
             new_action, _ = self.boltzmann_softmax(new_encoded_state, Q, temperature=self.temperature)
             # *************
-            print("a' = {}".format(new_action))
+            # print("a' = {}".format(new_action))
             Q = self.update_Q_sarsa(encoded_state, action, new_encoded_state, new_action,
                               reward, Q, learning_rate=self.learning_rate, discount=self.discount)
 
             if ps.is_in_taxi:
                 ps.location = 4
-                print('Passenger picked up at {}'.format(self.locs[ps.source]))
-            print('----------------------------------------------------')
             row, col = new_row, new_col
             encoded_state = self.encode(row, col, ps.location, ps.destination)
             tx.location = (new_row, new_col)
             action = new_action
-            counter += 1
+            step += 1
 
-        print('====================================================')
-        print('Episode Completed in {} steps ...'.format(counter))
-        print('passenger picked up at location: {}'.format(self.locs[ps.source]))
-        print('Passenger dropped at the destination: {}'.format(self.locs[ps.destination]))
-        print('====================================================')
+        print('  Episode Completed in {} steps...'.format(step))
+        print('  passenger picked up from {} putdown in {}'.format(self.locs[ps.source], self.locs[ps.destination]))
 
     def q_learning(self, tx, ps, Q):
+        # initialize state
+        row = tx.location[0]
+        col = tx.location[1]
+        state = (row, col, ps.source, ps.destination)
+        encoded_state = self.encode(row, col, ps.source, ps.destination)
+        self.visited_states[encoded_state] = state
+        step = 0
+
+        # loop for each step of episode
+        while ps.delivered != True:
+
+            action, _ = self.boltzmann_softmax(encoded_state, Q, temperature=self.temperature)  # select action a in state S
+
+            new_row, new_col, reward = self.action_effects(action, row, col, tx, ps)  # observe R and S'
+            new_state = (new_row, new_col, ps.location, ps.destination)  # define S'
+            new_encoded_state = self.encode(new_row, new_col, ps.source, ps.destination)  # encode S'
+
+            Q = self.update_Q_q_learning(encoded_state, action, new_encoded_state,
+                                    reward, Q, learning_rate=self.learning_rate, discount=self.discount)
+            if ps.is_in_taxi == True:
+                ps.location = 4
+
+            row, col = new_row, new_col
+            encoded_state = new_encoded_state
+            tx.location = (new_row, new_col)
+            step += 1
+
+        print('  Episode Completed in {} steps...'.format(step))
+        print('  passenger picked up from {} putdown in {}'.format(self.locs[ps.source], self.locs[ps.destination]))
+
+    def expected_sarsa(self, tx, ps, Q):
         # initialize state
         row = tx.location[0]
         col = tx.location[1]
@@ -160,7 +208,7 @@ class GridWorld:
         step = 0
         # loop for each step of episode
         while ps.delivered != True:
-            action, _ = self.boltzmann_softmax(encoded_state, Q, temperature=self.temperature)  # select action a in state S
+            action, prob = self.boltzmann_softmax(encoded_state, Q, temperature=self.temperature)  # select action a in state S
             # *************
             # print('S = ({}, {}) - {}'.format(row, col, encoded_state))
             # print('a = {}'.format(action))
@@ -172,58 +220,17 @@ class GridWorld:
             # print("S' = ({}, {}) - {}".format(new_row, new_col, new_encoded_state))
             # print('r = {}'.format(reward))
 
-            Q = self.update_Q_q_learning(encoded_state, action, new_encoded_state,
-                                    reward, Q, learning_rate=self.learning_rate, discount=self.discount)
-            if ps.is_in_taxi == True:
-                ps.location = 4
-                # print('Passenger picked up at {}'.format(self.locs[ps.source]))
-            # print('----------------------------------------------------')
-            row, col = new_row, new_col
-            encoded_state = new_encoded_state
-            tx.location = (new_row, new_col)
-            step += 1
-
-        # print('====================================================')
-        print('Episode Completed in {} steps...'.format(step))
-        print('passenger picked up from {} putdown in {}'.format(self.locs[ps.source], self.locs[ps.destination]))
-        # print('====================================================')
-
-    def expected_sarsa(self, tx, ps, Q):
-        # initialize state
-        row = tx.location[0]
-        col = tx.location[1]
-        state = (row, col, ps.source, ps.destination)
-        encoded_state = self.encode(row, col, ps.source, ps.destination)
-
-        # loop for each step of episode
-        while ps.delivered != True:
-            action, prob = self.boltzmann_softmax(encoded_state, Q, temperature=self.temperature)  # select action a in state S
-            # *************
-            print('S = ({}, {}) - {}'.format(row, col, encoded_state))
-            print('a = {}'.format(action))
-
-            new_row, new_col, reward = self.action_effects(action, row, col, tx, ps)  # observe R and S'
-            new_state = (new_row, new_col, ps.location, ps.destination)  # define S'
-            new_encoded_state = self.encode(new_row, new_col, ps.source, ps.destination)  # encode S'
-            # *************
-            print("S' = ({}, {}) - {}".format(new_row, new_col, new_encoded_state))
-            print('r = {}'.format(reward))
-
             Q = self.update_Q_expected_sarsa(encoded_state, action, new_encoded_state,
                                          reward, Q, prob, learning_rate=self.learning_rate, discount=self.discount)
             if ps.is_in_taxi == True:
                 ps.location = 4
-                print('Passenger picked up at {}'.format(self.locs[ps.source]))
-            print('----------------------------------------------------')
             row, col = new_row, new_col
             encoded_state = self.encode(row, col, ps.location, ps.destination)
             tx.location = (new_row, new_col)
+            step += 1
 
-        print('====================================================')
-        print('Episode Completed...')
-        print('passenger picked up at location: {}'.format(self.locs[ps.source]))
-        print('Passenger dropped at the destination: {}'.format(self.locs[ps.destination]))
-        print('====================================================')
+        print('  Episode Completed in {} steps...'.format(step))
+        print('  passenger picked up from {} putdown in {}'.format(self.locs[ps.source], self.locs[ps.destination]))
 
     def encode(self, taxi_row, taxi_col, pass_loc, dest_idx):
         # (5) 5, 5, 4
