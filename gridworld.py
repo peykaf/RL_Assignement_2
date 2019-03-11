@@ -250,6 +250,7 @@ class GridWorld:
         # numpy matrix element-wise division for denominator (sum of numerators)
         prob_t = np.true_divide(prob_t, sum(prob_t))
         action = np.random.choice(np.arange(6), p=prob_t)
+        a = 0
 
         return action, prob_t
 

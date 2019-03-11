@@ -1,77 +1,148 @@
 import gym
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
-env = gym.make("Taxi-v2").env
-
-q_table = np.zeros([env.observation_space.n, env.action_space.n])
-
-"""Training the agent"""
-
-import random
+# For animation
 from IPython.display import clear_output
+from time import sleep
 
-# Hyperparameters
-alpha = 0.1
-gamma = 0.6
-epsilon = 0.1
+class Agent:
+    def __init__(self, method, start_alpha=0.3, start_gamma=0.9, start_epsilon=0.5):
+        """method: one of 'q_learning', 'sarsa' or 'expected_sarsa' """
+        self.method = method
+        self.env = gym.make('Taxi-v2')
+        self.n_squares = 25
+        self.n_passenger_locs = 5
+        self.n_dropoffs = 4
+        self.n_actions = self.env.action_space.n
+        self.epsilon = start_epsilon
+        self.gamma = start_gamma
+        self.alpha = start_alpha
+        # Set up initial q-table
+        self.q = np.zeros(shape=(self.n_squares * self.n_passenger_locs * self.n_dropoffs, self.env.action_space.n))
+        # Set up policy pi, init as equiprobable random policy
+        self.pi = np.zeros_like(self.q)
+        for i in range(self.pi.shape[0]):
+            for a in range(self.n_actions):
+                self.pi[i, a] = 1 / self.n_actions
 
-# For plotting metrics
-all_epochs = []
-all_penalties = []
+    def simulate_episode(self):
+        s = self.env.reset()
+        done = False
+        r_sum = 0
+        n_steps = 0
+        gam = self.gamma
+        while not done:
+            n_steps += 1
+            # take action from policy
+            x = np.random.random()
+            a = np.argmax(np.cumsum(self.pi[s, :]) > x)
+            # take step
+            s_prime, r, done, info = self.env.step(a)
+            if self.method == 'q_learning':
+                a_prime = np.random.choice(np.where(self.q[s_prime] == max(self.q[s_prime]))[0])
+                self.q[s, a] = self.q[s, a] + self.alpha * \
+                               (r + gam * self.q[s_prime, a_prime] - self.q[s, a])
+            elif self.method == 'sarsa':
+                a_prime = np.argmax(np.cumsum(self.pi[s_prime, :]) > np.random.random())
+                self.q[s, a] = self.q[s, a] + self.alpha * \
+                               (r + gam * self.q[s_prime, a_prime] - self.q[s, a])
+            elif self.method == 'expected_sarsa':
+                self.q[s, a] = self.q[s, a] + self.alpha * \
+                               (r + gam * np.dot(self.pi[s_prime, :], self.q[s_prime, :]) - self.q[s, a])
+            else:
+                raise Exception("Invalid method provided")
+            # update policy
+            best_a = np.random.choice(np.where(self.q[s] == max(self.q[s]))[0])
+            for i in range(self.n_actions):
+                if i == best_a:
+                    self.pi[s, i] = 1 - (self.n_actions - 1) * (self.epsilon / self.n_actions)
+                else:
+                    self.pi[s, i] = self.epsilon / self.n_actions
 
-for i in range(1, 100001):
-    state = env.reset()
+            # decay gamma close to the end of the episode
+            if n_steps > 185:
+                gam *= 0.875
+            s = s_prime
+            r_sum += r
+        return r_sum
 
-    epochs, penalties, reward, = 0, 0, 0
+
+def train_agent(agent, n_episodes= 11, epsilon_decay = 0.99995, alpha_decay = 0.99995, print_trace = False):
+    r_sums = []
+    for ep in range(n_episodes):
+        r_sum = agent.simulate_episode()
+        # decrease epsilon and learning rate
+        agent.epsilon *= epsilon_decay
+        agent.alpha *= alpha_decay
+        if print_trace:
+            if ep % 10 == 0 and ep > 0 :
+                print("Episode:", ep, "alpha:", np.round(agent.alpha, 3), "epsilon:",  np.round(agent.epsilon, 3))
+                print ("Last 100 episodes avg reward: ", np.mean(r_sums[ep-10:ep]))
+        r_sums.append(r_sum)
+    return r_sums
+
+
+def generate_frames(agent, start_state):
+    agent.env.reset()
+    agent.env.env.s = start_state
+    s = start_state
+    policy = np.argmax(agent.pi,axis =1)
+    epochs = 0
+    penalties, reward = 0, 0
+    frames = []
     done = False
-
+    frames.append({
+        'frame': agent.env.render(mode='ansi'),
+        'state': agent.env.env.s ,
+        'action': "Start",
+        'reward': 0
+        }
+    )
     while not done:
-        if random.uniform(0, 1) < epsilon:
-            action = env.action_space.sample()  # Explore action space
-        else:
-            action = np.argmax(q_table[state])  # Exploit learned values
-
-        next_state, reward, done, info = env.step(action)
-
-        old_value = q_table[state, action]
-        next_max = np.max(q_table[next_state])
-
-        new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
-        q_table[state, action] = new_value
-
+        a = policy[s]
+        s, reward, done, info = agent.env.step(a)
         if reward == -10:
             penalties += 1
 
-        state = next_state
+        # Put each rendered frame into dict for animation
+        frames.append({
+            'frame': agent.env.render(mode='ansi'),
+            'state': s,
+            'action': a,
+            'reward': reward
+            }
+        )
         epochs += 1
+    print("Timesteps taken: {}".format(epochs))
+    print("Penalties incurred: {}".format(penalties))
+    return frames
 
-    if i % 100 == 0:
+def print_frames(frames):
+    for i, frame in enumerate(frames):
         clear_output(wait=True)
-        print(f"Episode: {i}")
+        print(frame['frame'].getvalue())
+        print(f"Timestep: {i + 1}")
+        print(f"State: {frame['state']}")
+        print(f"Action: {frame['action']}")
+        print(f"Reward: {frame['reward']}")
+        sleep(.4)
 
-print("Training finished.\n")
+if __name__ == '__main__':
+    # Create agents
+    sarsa_agent = Agent(method='sarsa')
+    e_sarsa_agent = Agent(method='expected_sarsa')
+    q_learning_agent = Agent(method='q_learning')
 
-total_epochs, total_penalties = 0, 0
-episodes = 100
+    # Train agents
+    r_sums_sarsa = train_agent(sarsa_agent, print_trace=True)
+    r_sums_e_sarsa = train_agent(e_sarsa_agent, print_trace=True)
+    r_sums_q_learning = train_agent(q_learning_agent, print_trace=True)
 
-for _ in range(episodes):
-    state = env.reset()
-    epochs, penalties, reward = 0, 0, 0
+    df = pd.DataFrame({"Sarsa": r_sums_sarsa,
+                 "Expected_Sarsa": r_sums_e_sarsa,
+                 "Q-Learning": r_sums_q_learning})
+    df_ma = df.rolling(100, min_periods = 100).mean()
+    df_ma.iloc[1:1000].plot()
 
-    done = False
-
-    while not done:
-        action = np.argmax(q_table[state])
-        state, reward, done, info = env.step(action)
-
-        if reward == -10:
-            penalties += 1
-
-        epochs += 1
-
-    total_penalties += penalties
-    total_epochs += epochs
-
-print(f"Results after {episodes} episodes:")
-print(f"Average timesteps per episode: {total_epochs / episodes}")
-print(f"Average penalties per episode: {total_penalties / episodes}")
