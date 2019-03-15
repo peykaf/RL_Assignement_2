@@ -44,7 +44,7 @@ class TaxiEnv:
                 self.q[state][action] += self.alpha * \
                                          (reward + self.gamma * self.q[next_state][next_action] - self.q[state][action])
             elif self.method == 'expected_sarsa':
-                self.q[state][action] += self.alpha * (reward + self.gamma * np.dot(probs, self.q[state])
+                self.q[state][action] += self.alpha * (reward + self.gamma * np.dot(probs, self.q[next_state])
                                                        - self.q[state][action])
 
             r_sum += reward
